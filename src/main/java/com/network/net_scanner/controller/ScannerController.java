@@ -37,7 +37,19 @@ public class ScannerController {
     public String closePort(@PathVariable int port) {
         String result = "";
         try {
-            // Correctly split arguments
+            /*
+            Wat the code doing:
+
+            1. the commands in processbuilder
+            2. create a process to run that.
+            3. get the output of the process by input pipeline
+
+
+            4. commands to kill thro processbuilder nd waitfor completion.
+            5. return the result.
+
+
+            */
             ProcessBuilder findPid = new ProcessBuilder(
                 "lsof",
                 "-t",
@@ -50,8 +62,6 @@ public class ScannerController {
             );
 
             String pid = reader.readLine();
-            // lsof -t can sometimes return multiple PIDs on separate lines
-            // For now, we just take the first one.
 
             if (pid != null && !pid.trim().isEmpty()) {
                 pid = pid.trim();
