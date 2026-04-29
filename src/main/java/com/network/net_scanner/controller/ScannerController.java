@@ -6,11 +6,9 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,54 +16,60 @@ import org.springframework.web.bind.annotation.RestController;
 public class ScannerController {
 
     @GetMapping("/scan")
-    public List<Integer> scanPorts(){
-        List <Integer> openPorts = new ArrayList<>();
+    public List<Integer> scanPorts() {
+        List<Integer> openPorts = new ArrayList<>();
 
-        for (int port = 80; port <= 30000; port++){
+        for (int port = 80; port <= 30000; port++) {
             try {
-                
                 Socket socket = new Socket();
                 socket.connect(new InetSocketAddress("127.0.0.1", port), 50);
                 socket.close();
                 openPorts.add(port);
                 System.out.println("Port " + port + " is open!");
-        
-
-            } catch (Exception e){
-
-            }
+            } catch (Exception e) {}
         }
 
         return openPorts;
     }
+
+    // LEARN AS YOU BUILD IT.
     @GetMapping("/close/{port}")
     public String closePort(@PathVariable int port) {
-        if (port == 8080) return "Self-termination blocked!";
-
+        String result = "";
         try {
-            ProcessBuilder killBuilder = new ProcessBuilder("fuser", "-k", port + "/tcp");
-            Process process = killBuilder.start();
+            // Correctly split arguments
+            ProcessBuilder findPid = new ProcessBuilder(
+                "lsof",
+                "-t",
+                "-i:" + port
+            );
 
-            // 1. Read the error message from Linux
-            BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            StringBuilder errorMessage = new StringBuilder();
-            String line;
-            while ((line = errorReader.readLine()) != null) {
-                errorMessage.append(line);
-            }
+            Process findProcess = findPid.start();
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(findProcess.getInputStream())
+            );
 
-            int exitCode = process.waitFor();
+            String pid = reader.readLine();
+            // lsof -t can sometimes return multiple PIDs on separate lines
+            // For now, we just take the first one.
 
-            if (exitCode == 0) {
-                return "Success: Port " + port + " closed.";
+            if (pid != null && !pid.trim().isEmpty()) {
+                pid = pid.trim();
+                System.out.println("Found PID: " + pid);
+
+                ProcessBuilder killPid = new ProcessBuilder("kill", "-9", pid);
+                int exitCode = killPid.start().waitFor();
+
+                result = (exitCode == 0)
+                    ? "Success: Port " + port + " closed."
+                    : "Failed to kill process.";
             } else {
-                // 2. Return the actual Linux error to the browser
-                return "Failed! Linux says: " + errorMessage.toString() + " (Exit Code: " + exitCode + ")";
+                result = "Failed: No process found on port " + port;
             }
         } catch (Exception e) {
-            return "Java Error: " + e.getMessage();
+            e.printStackTrace();
+            result = "Error: " + e.getMessage();
         }
+        return result;
     }
 }
-
-    
